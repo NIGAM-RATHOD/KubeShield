@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: kubeshield
+# CIS Benchmark 5.1.5: Ensure that default service account tokens are not automatically mounted
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: default
+# Harden default namespace default SA as well
+automountServiceAccountToken: false

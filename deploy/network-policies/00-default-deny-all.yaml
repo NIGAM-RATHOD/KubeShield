@@ -1,0 +1,15 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: kubeshield
+  labels:
+    app.kubernetes.io/part-of: kubeshield-security
+    security.policy: zero-trust-default-deny
+spec:
+  # Matches all pods in the kubeshield namespace
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  # Empty ingress and egress sections mean ZERO traffic is allowed by default

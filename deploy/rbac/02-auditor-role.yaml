@@ -1,0 +1,62 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: auditor
+  namespace: kubeshield
+  labels:
+    app.kubernetes.io/name: auditor-role
+    app.kubernetes.io/part-of: kubeshield
+rules:
+  # Core resources read-only (EXCLUDING Secrets)
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - pods/status
+      - services
+      - endpoints
+      - configmaps
+      - events
+      - persistentvolumeclaims
+      - resourcequotas
+      - limitranges
+    verbs: ["get", "list", "watch"]
+
+  # Workloads read-only
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - replicasets
+      - statefulsets
+      - daemonsets
+    verbs: ["get", "list", "watch"]
+
+  # NetworkPolicies & Ingresses read-only
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - networkpolicies
+      - ingresses
+    verbs: ["get", "list", "watch"]
+
+  # External Secrets read-only inspection (metadata only, no raw secret payloads)
+  - apiGroups: ["external-secrets.io"]
+    resources:
+      - externalsecrets
+      - secretstores
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: auditor-binding
+  namespace: kubeshield
+  labels:
+    app.kubernetes.io/part-of: kubeshield
+subjects:
+  - kind: ServiceAccount
+    name: auditor-sa
+    namespace: kubeshield
+roleRef:
+  kind: Role
+  name: auditor
+  apiGroup: rbac.authorization.k8s.io

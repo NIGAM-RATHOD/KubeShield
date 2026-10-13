@@ -1,0 +1,51 @@
+# =============================================================================
+# Ingress Policy on orders-api:
+# Only allow incoming TCP traffic on port 8000 specifically from the 'frontend' pod
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-orders-api-ingress-from-frontend
+  namespace: kubeshield
+  labels:
+    app.kubernetes.io/part-of: kubeshield-security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: orders-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: frontend
+      ports:
+        - protocol: TCP
+          port: 8000
+---
+# =============================================================================
+# Egress Policy on frontend:
+# Allow outgoing TCP traffic only to orders-api pods on port 8000
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-egress-to-orders-api
+  namespace: kubeshield
+  labels:
+    app.kubernetes.io/part-of: kubeshield-security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: orders-api
+      ports:
+        - protocol: TCP
+          port: 8000

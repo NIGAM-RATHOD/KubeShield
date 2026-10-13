@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: kubeshield
+  labels:
+    app.kubernetes.io/part-of: kubeshield-security
+spec:
+  # Pods that require internal cluster DNS resolution (frontend and orders-api)
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: ["orders-api", "frontend"]
+  policyTypes:
+    - Egress
+  egress:
+    # Allow UDP and TCP port 53 to CoreDNS/kube-dns pods in kube-system
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

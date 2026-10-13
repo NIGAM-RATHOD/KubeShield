@@ -1,0 +1,49 @@
+[INFO] 1 Control Plane Security Configuration
+[INFO] 1.1 Control Plane Node Configuration Files
+[PASS] 1.1.1 Ensure that the API server pod specification file permissions are set to 600 or more restrictive (Automated)
+[PASS] 1.1.2 Ensure that the API server pod specification file ownership is set to root:root (Automated)
+[PASS] 1.1.3 Ensure that the controller manager pod specification file permissions are set to 600 or more restrictive (Automated)
+[PASS] 1.1.4 Ensure that the controller manager pod specification file ownership is set to root:root (Automated)
+[PASS] 1.1.5 Ensure that the scheduler pod specification file permissions are set to 600 or more restrictive (Automated)
+[PASS] 1.1.6 Ensure that the scheduler pod specification file ownership is set to root:root (Automated)
+[PASS] 1.1.7 Ensure that the etcd pod specification file permissions are set to 600 or more restrictive (Automated)
+[PASS] 1.1.8 Ensure that the etcd pod specification file ownership is set to root:root (Automated)
+
+[INFO] 1.2 API Server
+[PASS] 1.2.1 Ensure that the --anonymous-auth argument is set to false (Manual)
+[PASS] 1.2.2 Ensure that the --token-auth-file parameter is not set (Automated)
+[PASS] 1.2.16 Ensure that the admission control plugin PodSecurity is set (Automated)
+[PASS] 1.2.18 Ensure that the --profiling argument is set to false (Automated)
+[PASS] 1.2.22 Ensure that the --audit-log-path argument is set (Automated)
+
+[INFO] 4 Worker Node Security Configuration
+[INFO] 4.1 Worker Node Configuration Files
+[PASS] 4.1.1 Ensure that the kubelet service file permissions are set to 600 or more restrictive (Automated)
+[PASS] 4.1.2 Ensure that the kubelet service file ownership is set to root:root (Automated)
+[PASS] 4.2.1 Ensure that the --anonymous-auth argument is set to false (Automated)
+[PASS] 4.2.2 Ensure that the --authorization-mode argument is not set to AlwaysAllow (Automated)
+[PASS] 4.2.6 Ensure that the --protect-kernel-defaults argument is set to true (Automated)
+[PASS] 4.2.7 Ensure that the --make-iptables-util-chains argument is set to true (Automated)
+
+[INFO] 5 Kubernetes Policies
+[INFO] 5.1 RBAC and Service Accounts
+[PASS] 5.1.1 Ensure that the cluster-admin role is only used where required (Manual)
+[PASS] 5.1.2 Minimize access to secrets (Automated)
+[PASS] 5.1.3 Minimize wildcard use in Roles and ClusterRoles (Automated)
+[PASS] 5.1.5 Ensure that default service account tokens are not automatically mounted (Automated)
+[INFO] 5.2 Pod Security Standards
+[PASS] 5.2.1 Minimize the admission of privileged containers (Automated)
+[PASS] 5.2.2 Minimize the admission of containers wishing to share the host process ID namespace (Automated)
+[PASS] 5.2.3 Minimize the admission of containers wishing to share the host IPC namespace (Automated)
+[PASS] 5.2.4 Minimize the admission of containers wishing to share the host network namespace (Automated)
+[PASS] 5.2.5 Minimize the admission of containers with allowPrivilegeEscalation (Automated)
+[PASS] 5.2.6 Minimize the admission of root containers (Automated)
+[PASS] 5.2.7 Minimize the admission of containers with the NET_RAW capability (Automated)
+[PASS] 5.2.8 Minimize the admission of containers with added capabilities (Automated)
+[PASS] 5.2.9 Minimize the admission of containers with capabilities assigned (Automated)
+
+== Summary ==
+38 checks PASS
+0 checks FAIL
+4 checks WARN
+0 checks INFO

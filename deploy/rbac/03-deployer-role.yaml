@@ -1,0 +1,59 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: deployer
+  namespace: kubeshield
+  labels:
+    app.kubernetes.io/name: deployer-role
+    app.kubernetes.io/part-of: kubeshield
+rules:
+  # Workload deployment & lifecycle management
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - replicasets
+      - statefulsets
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Core services, configmaps, pods management
+  - apiGroups: [""]
+    resources:
+      - services
+      - configmaps
+      - pods
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Read-only inspect secrets needed for deployment validation (cannot delete or tamper)
+  - apiGroups: [""]
+    resources:
+      - secrets
+    verbs: ["get", "list", "watch"]
+
+  # NetworkPolicies deployment
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - networkpolicies
+      - ingresses
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # External Secrets sync triggers
+  - apiGroups: ["external-secrets.io"]
+    resources:
+      - externalsecrets
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: deployer-binding
+  namespace: kubeshield
+  labels:
+    app.kubernetes.io/part-of: kubeshield
+subjects:
+  - kind: ServiceAccount
+    name: deployer-sa
+    namespace: kubeshield
+roleRef:
+  kind: Role
+  name: deployer
+  apiGroup: rbac.authorization.k8s.io
