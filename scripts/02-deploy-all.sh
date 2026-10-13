@@ -45,7 +45,7 @@ kubectl apply -f "${ROOT_DIR}/deploy/apps/frontend-pod.yaml"
 kubectl apply -f "${ROOT_DIR}/deploy/apps/rogue-pod.yaml"
 
 echo "--> Waiting for pods to reach Ready status in namespace 'kubeshield'..."
-kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=orders-api -n kubeshield --timeout=120s
+kubectl rollout status deployment/orders-api -n kubeshield --timeout=120s
 kubectl wait --for=condition=Ready pod/frontend -n kubeshield --timeout=120s
 kubectl wait --for=condition=Ready pod/rogue -n kubeshield --timeout=120s
 

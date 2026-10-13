@@ -13,6 +13,7 @@ GREEN="\033[0;32m"
 RED="\033[0;31m"
 YELLOW="\033[1;33m"
 NC="\033[0m"
+FAILURES=0
 
 echo "================================================================================"
 echo "==> [Phase 2] Verifying Calico Zero-Trust NetworkPolicies in namespace: ${NAMESPACE}"
@@ -40,16 +41,20 @@ if [ "${FRONTEND_STATUS}" == "200" ]; then
   echo -e "${GREEN}[PASS] TEST 1 SUCCEEDED: Frontend successfully reached orders-api with HTTP 200 OK.${NC}"
 else
   echo -e "${RED}[FAIL] TEST 1 FAILED: Expected HTTP 200 but received status: ${FRONTEND_STATUS}${NC}"
+  FAILURES=$((FAILURES + 1))
 fi
 
 # -----------------------------------------------------------------------------
 # TEST 2: Rogue Pod -> orders-api (Port 8000) [EXPECTED: BLOCKED / TIMEOUT]
 # -----------------------------------------------------------------------------
-echo -e "\n${YELLOW}[TEST 2] Testing Unauthorized Rogue Traffic: rogue -> orders-api:8000/healthz${NC}"
-echo "Command: kubectl exec -n ${NAMESPACE} rogue -- curl -s -m 4 -w \"\nHTTP_STATUS:%{http_code}\" http://orders-api:8000/healthz"
+# The rogue pod has no DNS egress, so target the Service ClusterIP directly. This proves the
+# TCP connection itself is dropped, rather than the request merely failing at name resolution.
+ORDERS_IP=$(kubectl get svc orders-api -n "${NAMESPACE}" -o jsonpath='{.spec.clusterIP}')
+echo -e "\n${YELLOW}[TEST 2] Testing Unauthorized Rogue Traffic: rogue -> orders-api (${ORDERS_IP}:8000)/healthz${NC}"
+echo "Command: kubectl exec -n ${NAMESPACE} rogue -- curl -v -m 4 http://${ORDERS_IP}:8000/healthz"
 
 ROGUE_START=$(date +%s)
-ROGUE_RESULT=$(kubectl exec -n "${NAMESPACE}" rogue -- curl -v -m 4 http://orders-api:8000/healthz 2>&1 || true)
+ROGUE_RESULT=$(kubectl exec -n "${NAMESPACE}" rogue -- curl -v -m 4 "http://${ORDERS_IP}:8000/healthz" 2>&1 || true)
 ROGUE_END=$(date +%s)
 DURATION=$((ROGUE_END - ROGUE_START))
 
@@ -61,6 +66,7 @@ if echo "${ROGUE_RESULT}" | grep -qiE "timed out|connection refused|failed to co
   echo "    Packets were silently dropped at the Calico veth filter layer."
 else
   echo -e "${RED}[FAIL] TEST 2 FAILED: Rogue pod was NOT blocked! Check NetworkPolicy selector.${NC}"
+  FAILURES=$((FAILURES + 1))
 fi
 
 # -----------------------------------------------------------------------------
@@ -68,12 +74,24 @@ fi
 # -----------------------------------------------------------------------------
 echo -e "\n${YELLOW}[TEST 3] Testing DNS Resolution Egress: frontend vs rogue${NC}"
 echo "--> Testing DNS resolution from authorized frontend pod..."
-FRONTEND_DNS=$(kubectl exec -n "${NAMESPACE}" frontend -- nslookup orders-api.kubeshield.svc.cluster.local 2>&1 || true)
-echo "${FRONTEND_DNS}"
+if FRONTEND_DNS=$(kubectl exec -n "${NAMESPACE}" frontend -- nslookup orders-api.kubeshield.svc.cluster.local 2>&1); then
+  echo "${FRONTEND_DNS}"
+  echo -e "${GREEN}[PASS] Frontend DNS resolution ALLOWED.${NC}"
+else
+  echo "${FRONTEND_DNS}"
+  echo -e "${RED}[FAIL] Frontend could not resolve orders-api.${NC}"
+  FAILURES=$((FAILURES + 1))
+fi
 
 echo "--> Testing DNS resolution from rogue pod (no DNS egress policy)..."
-ROGUE_DNS=$(kubectl exec -n "${NAMESPACE}" rogue -- nslookup -timeout=3 orders-api.kubeshield.svc.cluster.local 2>&1 || true)
-echo "${ROGUE_DNS}"
+if ROGUE_DNS=$(kubectl exec -n "${NAMESPACE}" rogue -- nslookup -timeout=3 orders-api.kubeshield.svc.cluster.local 2>&1); then
+  echo "${ROGUE_DNS}"
+  echo -e "${RED}[FAIL] Rogue pod resolved DNS; egress is NOT blocked.${NC}"
+  FAILURES=$((FAILURES + 1))
+else
+  echo "${ROGUE_DNS}"
+  echo -e "${GREEN}[PASS] Rogue pod DNS egress BLOCKED.${NC}"
+fi
 
 # -----------------------------------------------------------------------------
 # Summary
@@ -88,3 +106,9 @@ echo "| rogue      | orders-api          | 8000 | default-deny-all (Zero-Trust) 
 echo "| frontend   | kube-dns            | 53   | allow-dns-egress                 | ALLOWED |"
 echo "| rogue      | kube-dns            | 53   | default-deny-all (Zero-Trust)    | BLOCKED |"
 echo "================================================================================"
+
+if [ "${FAILURES}" -gt 0 ]; then
+  echo -e "${RED}${FAILURES} NetworkPolicy check(s) FAILED.${NC}"
+  exit 1
+fi
+echo -e "${GREEN}All NetworkPolicy checks passed.${NC}"

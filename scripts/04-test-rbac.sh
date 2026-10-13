@@ -12,6 +12,7 @@ GREEN="\033[0;32m"
 RED="\033[0;31m"
 CYAN="\033[0;36m"
 NC="\033[0m"
+FAILURES=0
 
 echo "================================================================================"
 echo "==> [Phase 3] RBAC Permission Verification Matrix ('kubectl auth can-i')"
@@ -28,17 +29,18 @@ run_auth_check() {
   local ns="$4"
   local expected="$5"
 
-  local cmd="kubectl auth can-i ${verb} ${resource} --as=${sa}"
+  local args=(auth can-i "${verb}" "${resource}" "--as=${sa}")
   if [ -n "${ns}" ]; then
-    cmd="${cmd} -n ${ns}"
+    args+=(-n "${ns}")
   fi
 
   local actual
-  actual=$(eval "${cmd}" 2>&1)
+  actual=$(kubectl "${args[@]}" 2>/dev/null)
 
   local status_color="${GREEN}"
   if [ "${actual}" != "${expected}" ]; then
     status_color="${RED}"
+    FAILURES=$((FAILURES + 1))
   fi
 
   printf "| %-13s | %-8s | %-16s | %-12s | %-8s | ${status_color}%-7s${NC} |\n" \
@@ -76,5 +78,10 @@ run_auth_check "${DEPLOYER_SA}" "create" "deployments" "default" "no"
 echo "+---------------+----------+------------------+--------------+----------+---------+"
 
 echo -e "\n================================================================================"
-echo "==> RBAC Verification Completed! All security boundary assertions confirmed."
+if [ "${FAILURES}" -gt 0 ]; then
+  echo -e "${RED}==> RBAC Verification FAILED: ${FAILURES} assertion(s) did not match expectations.${NC}"
+  echo "================================================================================"
+  exit 1
+fi
+echo -e "${GREEN}==> RBAC Verification Completed! All security boundary assertions confirmed.${NC}"
 echo "================================================================================"
