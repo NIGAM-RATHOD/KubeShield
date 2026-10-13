@@ -142,26 +142,28 @@ Traffic is permitted because:
 kubectl exec -n kubeshield rogue -- curl -v -m 4 http://orders-api:8000/healthz
 ```
 
-#### Expected Output & Terminal Transcript:
+#### Expected Output:
 ```text
-*   Trying 10.96.142.88:8000...
-* Connection timed out after 4001 milliseconds
+* Resolving timed out after 4002 milliseconds
 * Closing connection
-curl: (28) Failed to connect to orders-api port 8000 after 4001 ms: Couldn't connect to server
+curl: (28) Resolving timed out after 4002 milliseconds
 command terminated with exit code 28
 ```
 
 #### Rationale:
-Traffic is dropped because:
-1. The `rogue` pod does not match the ingress label selector on `orders-api`.
-2. The namespace default-deny egress policy blocks unauthorized outgoing packets from `rogue`.
-3. Calico silently drops SYN packets at the virtual ethernet boundary; no TCP handshake can be completed.
+The request never leaves the pod because:
+1. The `rogue` pod is not selected by `allow-dns-egress`, so its DNS queries to CoreDNS are dropped and the
+   `orders-api` hostname cannot be resolved.
+2. The namespace default-deny egress policy blocks all other outgoing packets from `rogue`.
+3. Even with a resolved address, `rogue` does not match the ingress selector on `orders-api` (see Test 3).
 
 ---
 
 ### Test 3: Rogue Pod Direct IP Probe (Bypassing DNS)
 
-Even if the rogue pod attempts to connect directly to the `orders-api` pod IP:
+Even if the rogue pod skips DNS and connects directly to the `orders-api` pod IP, Calico drops the TCP SYN
+packets and no handshake can complete. The automated test scripts use this direct-IP form (against the Service
+ClusterIP) so that they verify packet filtering rather than only DNS failure:
 
 #### Execution Command:
 ```bash

@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   localstack:
     image: localstack/localstack:3.3.0
@@ -10,7 +8,6 @@ services:
     environment:
       - SERVICES=kms,secretsmanager,sts
       - AWS_DEFAULT_REGION=us-east-1
-      - DOCKER_HOST=unix:///var/run/docker.sock
       - DEBUG=0
     volumes:
       - "./localstack/init-scripts:/etc/localstack/init/ready.d"

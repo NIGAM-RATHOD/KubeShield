@@ -37,17 +37,27 @@ $Tests = @(
 Write-Host "`nIdentity      | Verb     | Resource         | Scope        | Expected | Result"
 Write-Host "--------------+----------+------------------+--------------+----------+-------"
 
+$Failures = 0
 foreach ($t in $Tests) {
-    $cmd = "kubectl auth can-i $($t.Verb) $($t.Resource) --as=$($t.FullSA)"
+    $kubectlArgs = @("auth", "can-i", $t.Verb, $t.Resource, "--as=$($t.FullSA)")
     if ($t.Scope -ne "") {
-        $cmd += " -n $($t.Scope)"
+        $kubectlArgs += @("-n", $t.Scope)
     }
-    $actual = (Invoke-Expression $cmd 2>&1).Trim()
+    $actual = ((& kubectl @kubectlArgs 2>$null) | Out-String).Trim()
     $scopeDisplay = if ($t.Scope -ne "") { $t.Scope } else { "cluster" }
 
-    $color = if ($actual -eq $t.Expected) { "Green" } else { "Red" }
+    if ($actual -eq $t.Expected) {
+        $color = "Green"
+    } else {
+        $color = "Red"
+        $Failures++
+    }
     Write-Host ("{0,-13} | {1,-8} | {2,-16} | {3,-12} | {4,-8} | " -f $t.SA, $t.Verb, $t.Resource, $scopeDisplay, $t.Expected) -NoNewline
     Write-Host ("{0,-6}" -f $actual) -ForegroundColor $color
 }
 
-Write-Host "`nRBAC Verification Complete." -ForegroundColor Cyan
+if ($Failures -gt 0) {
+    Write-Host "`nRBAC Verification FAILED: $Failures assertion(s) did not match expectations." -ForegroundColor Red
+    exit 1
+}
+Write-Host "`nRBAC Verification Complete. All assertions passed." -ForegroundColor Green

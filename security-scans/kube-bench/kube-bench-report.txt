@@ -1,3 +1,6 @@
+# Representative kube-bench output for a hardened control plane (abridged).
+# Results on a local Kind cluster will differ; regenerate with ./scripts/06-run-security-audits.sh
+
 [INFO] 1 Control Plane Security Configuration
 [INFO] 1.1 Control Plane Node Configuration Files
 [PASS] 1.1.1 Ensure that the API server pod specification file permissions are set to 600 or more restrictive (Automated)

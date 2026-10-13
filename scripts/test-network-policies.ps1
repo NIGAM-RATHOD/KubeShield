@@ -3,6 +3,7 @@
 # PowerShell verification script for Calico NetworkPolicies in KubeShield
 # =============================================================================
 $Namespace = "kubeshield"
+$Failures = 0
 Write-Host "================================================================================" -ForegroundColor Cyan
 Write-Host "==> Verifying Calico Zero-Trust NetworkPolicies in namespace: $Namespace" -ForegroundColor Cyan
 Write-Host "================================================================================" -ForegroundColor Cyan
@@ -17,12 +18,15 @@ if ($statusLine -eq "200") {
     Write-Host ($frontendOutput | Where-Object { $_ -notmatch "HTTP_STATUS" })
 } else {
     Write-Host "[FAIL] TEST 1 FAILED: Expected HTTP 200, received: $statusLine" -ForegroundColor Red
+    $Failures++
 }
 
 # Test 2: Rogue -> orders-api (Port 8000) [EXPECTED: TIMEOUT / BLOCKED]
-Write-Host "`n[TEST 2] Rogue Traffic: rogue -> orders-api:8000/healthz" -ForegroundColor Yellow
+# The rogue pod has no DNS egress, so target the Service ClusterIP directly to prove the TCP connection is dropped
+$ordersIp = kubectl get svc orders-api -n $Namespace -o jsonpath='{.spec.clusterIP}'
+Write-Host "`n[TEST 2] Rogue Traffic: rogue -> orders-api (${ordersIp}:8000)/healthz" -ForegroundColor Yellow
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
-$rogueOutput = kubectl exec -n $Namespace rogue -- curl -v -m 4 http://orders-api:8000/healthz 2>&1
+$rogueOutput = (kubectl exec -n $Namespace rogue -- curl -v -m 4 "http://${ordersIp}:8000/healthz" 2>&1 | Out-String)
 $sw.Stop()
 
 if ($rogueOutput -match "timed out|Connection timed out|exit code 28|failed to connect") {
@@ -30,6 +34,7 @@ if ($rogueOutput -match "timed out|Connection timed out|exit code 28|failed to c
     Write-Host "    Packets were silently dropped at the Calico veth filter layer."
 } else {
     Write-Host "[FAIL] TEST 2 FAILED: Rogue pod was NOT blocked!" -ForegroundColor Red
+    $Failures++
     Write-Host $rogueOutput
 }
 
@@ -37,9 +42,27 @@ if ($rogueOutput -match "timed out|Connection timed out|exit code 28|failed to c
 Write-Host "`n[TEST 3] Testing DNS Egress Resolution" -ForegroundColor Yellow
 Write-Host "--> Frontend DNS query:"
 kubectl exec -n $Namespace frontend -- nslookup orders-api.kubeshield.svc.cluster.local 2>&1
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "[PASS] Frontend DNS resolution ALLOWED." -ForegroundColor Green
+} else {
+    Write-Host "[FAIL] Frontend could not resolve orders-api." -ForegroundColor Red
+    $Failures++
+}
 Write-Host "--> Rogue pod DNS query (should fail/time out):"
 kubectl exec -n $Namespace rogue -- nslookup -timeout=3 orders-api.kubeshield.svc.cluster.local 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[PASS] Rogue pod DNS egress BLOCKED." -ForegroundColor Green
+} else {
+    Write-Host "[FAIL] Rogue pod resolved DNS; egress is NOT blocked." -ForegroundColor Red
+    $Failures++
+}
 
 Write-Host "`n================================================================================" -ForegroundColor Cyan
 Write-Host "==> Calico NetworkPolicy Verification Matrix Summary Completed" -ForegroundColor Cyan
 Write-Host "================================================================================" -ForegroundColor Cyan
+
+if ($Failures -gt 0) {
+    Write-Host "$Failures NetworkPolicy check(s) FAILED." -ForegroundColor Red
+    exit 1
+}
+Write-Host "All NetworkPolicy checks passed." -ForegroundColor Green

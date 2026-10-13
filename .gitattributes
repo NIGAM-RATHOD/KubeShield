@@ -1,0 +1,9 @@
+# Keep LF line endings for files executed inside Linux containers / shells
+*.sh   text eol=lf
+*.py   text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+Dockerfile text eol=lf
+
+# PowerShell scripts use CRLF on Windows
+*.ps1  text eol=crlf

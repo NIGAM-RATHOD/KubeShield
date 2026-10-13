@@ -13,12 +13,12 @@ import time
 import uuid
 import json
 import logging
-from typing import Optional, Dict, Any, List
+from datetime import datetime, timezone
+from typing import Dict, Any, List
 
-from fastapi import FastAPI, Request, Response, HTTPException, status
+from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
-import prometheus_client
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 # -----------------------------------------------------------------------------
@@ -28,7 +28,10 @@ class JSONFormatter(logging.Formatter):
     """Formats log records as single-line JSON objects for SIEM ingestion."""
     def format(self, record: logging.LogRecord) -> str:
         log_obj: Dict[str, Any] = {
-            "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S.%fZ"),
+            # time.strftime() does not support %f, so build the ISO-8601 UTC timestamp via datetime
+            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc)
+            .isoformat(timespec="milliseconds")
+            .replace("+00:00", "Z"),
             "level": record.levelname,
             "service": "orders-api",
             "environment": os.getenv("ENVIRONMENT", "k8s-hardened"),
@@ -106,12 +109,12 @@ app = FastAPI(
 # Data Models & Database Mock
 # -----------------------------------------------------------------------------
 class OrderCreate(BaseModel):
-    customer_id: str = Field(..., example="cust_shield_401")
+    customer_id: str = Field(..., min_length=1, max_length=64, examples=["cust_shield_401"])
     items: List[Dict[str, Any]] = Field(
         default_factory=lambda: [{"sku": "yubikey-5c", "quantity": 2, "price": 55.00}],
-        example=[{"sku": "yubikey-5c", "quantity": 2, "price": 55.00}],
+        examples=[[{"sku": "yubikey-5c", "quantity": 2, "price": 55.00}]],
     )
-    total_amount: float = Field(default=110.00, example=110.00)
+    total_amount: float = Field(default=110.00, ge=0, examples=[110.00])
 
 ORDERS_DB: Dict[str, Dict[str, Any]] = {
     "ord-1001": {
@@ -149,18 +152,21 @@ async def security_telemetry_middleware(request: Request, call_next):
         status_code = 500
         log_event(
             "ERROR",
-            f"Unhandled exception during request: {str(exc)}",
+            f"Unhandled exception during request: {exc}",
             trace_id=trace_id,
             method=method,
             path=path,
             client_ip=client_ip,
         )
-        raise exc
+        raise
     finally:
         duration_sec = time.time() - start_time
+        # Label metrics by route template (e.g. /api/v1/orders/{order_id}) to keep cardinality bounded
+        route = request.scope.get("route")
+        metric_path = getattr(route, "path", "unmatched")
         IN_FLIGHT_REQUESTS.labels(app="orders-api").dec()
-        REQUEST_COUNT.labels(method=method, path=path, status=str(status_code), app="orders-api").inc()
-        REQUEST_DURATION_SECONDS.labels(method=method, path=path, app="orders-api").observe(duration_sec)
+        REQUEST_COUNT.labels(method=method, path=metric_path, status=str(status_code), app="orders-api").inc()
+        REQUEST_DURATION_SECONDS.labels(method=method, path=metric_path, app="orders-api").observe(duration_sec)
 
         level = "INFO" if status_code < 400 else ("WARN" if status_code < 500 else "ERROR")
         log_event(

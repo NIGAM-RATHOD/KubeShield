@@ -27,3 +27,6 @@ localstack_data/
 # OS artifacts
 .DS_Store
 Thumbs.db
+
+# Generated security scan reports
+security-scans/kubescape/reports/

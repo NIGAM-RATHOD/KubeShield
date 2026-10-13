@@ -88,6 +88,11 @@ The following table compares an unhardened baseline Kubernetes deployment agains
 
 ## 4. Benchmark Scan Reports
 
+> **Note:** The summaries below are representative target results for the hardened workload manifests.
+> Results vary by Kubernetes distribution: a local Kind control plane does not enable every CIS control
+> (for example audit logging or `--profiling=false`), so some kube-bench checks will report `FAIL`/`WARN` there.
+> Run `./scripts/06-run-security-audits.sh` to generate results for your own cluster.
+
 ### 4.1 Kube-bench CIS Kubernetes Benchmark Summary
 ```text
 == Summary ==

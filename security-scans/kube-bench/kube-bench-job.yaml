@@ -17,7 +17,8 @@ spec:
       containers:
         - name: kube-bench
           image: aquasec/kube-bench:v0.7.3
-          command: ["kube-bench", "run", "--targets", "master,node", "--json"]
+          # Auto-detects node role; plain-text output keeps `kubectl logs` readable
+          command: ["kube-bench"]
           volumeMounts:
             - name: var-lib-etcd
               mountPath: /var/lib/etcd
